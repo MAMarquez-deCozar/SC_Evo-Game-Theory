@@ -28,9 +28,9 @@ def get_rates(i, N, beta, sigma):
     return w_plus, w_minus
 
 # ==========================================
-# 1. Exact Linear Theory
+# 1. Matrix Solver
 # ==========================================
-def solve_linear_theory_matrix(p_plus, p_minus_val):
+def solve_matrix(p_plus, p_minus_val):
     """
     Solves the coupled boundary value problem:
     w_i^+ phi_{i+1} + w_i^- phi_{i-1} + p (phi_i_opp - phi_i) - (w_i^+ + w_i^-) phi_i = 0
@@ -95,8 +95,7 @@ def gillespie_run(args):
     single event is selected with probability proportional to its own rate.
 
     Returns (fixated, time) where time is the continuous (Gillespie) time
-    elapsed. The time value is not used downstream but is kept so the SSA
-    remains a faithful continuous-time simulation.
+    elapsed. 
     """
     p_plus, p_minus_val, init_env = args
     rng = np.random.default_rng()
@@ -143,7 +142,7 @@ if __name__ == '__main__':
 
     print("Solving Theory via Matrix Method...")
     for p in p_plus_range:
-        tp, tm = solve_linear_theory_matrix(p, p_minus)
+        tp, tm = solve_matrix(p, p_minus)
         theory_p.append(tp)
         theory_m.append(tm)
 
