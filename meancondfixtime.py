@@ -1,5 +1,5 @@
 # Script that calculates the mean conditional fixation time of a system  with respect to its p_+, 
-# using both the Exact Linear Theory and a Gillespie Algorithm as shown by Ashcroft et al. (2014)
+# using both a Discrete Moran Process and a direct matrix solver
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,9 +29,9 @@ def get_rates(i, N, beta, sigma):
     return w_plus, w_minus
 
 # ==========================================
-# 1. Exact Linear Theory (Matrix Solver)
+# 1. Matrix Solver
 # ==========================================
-def solve_theory_matrix(p_plus, p_minus_val):
+def solve_matrix(p_plus, p_minus_val):
     num_states = (N - 1) * 2
     P = np.zeros((num_states, num_states))
     B_phi = np.zeros(num_states)
@@ -140,7 +140,7 @@ if __name__ == '__main__':
 
     print("Solving Conditional Time Theory via Matrix Method...")
     for p in p_plus_range:
-        tp, tm = solve_theory_matrix(p, p_minus)
+        tp, tm = solve_matrix(p, p_minus)
         theory_t_p.append(tp)
         theory_t_m.append(tm)
 
