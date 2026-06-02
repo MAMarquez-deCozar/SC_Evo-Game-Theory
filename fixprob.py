@@ -1,15 +1,14 @@
-### Script for the third task of the SC project ###
+### Script for the third task of the SC project  ###
 
 import numpy as np
 import matplotlib.pyplot as plt
 import multiprocessing as mp
-from scipy.sparse import linalg, eye, csr_matrix
 
 # ==========================================
 # Parameters
 # ==========================================
 N = 50           # Population size
-beta = 0.5       # Intensity of selection 
+beta = 0.5       # Intensity of selection
 p_minus = 0.01   # Fixed switching probability from +1 to -1
 
 def get_payoffs(i, N, sigma):
@@ -29,7 +28,7 @@ def get_rates(i, N, beta, sigma):
     return w_plus, w_minus
 
 # ==========================================
-# 1. Exact Linear Theory 
+# 1. Exact Linear Theory
 # ==========================================
 def solve_linear_theory_matrix(p_plus, p_minus_val):
     """
@@ -47,7 +46,7 @@ def solve_linear_theory_matrix(p_plus, p_minus_val):
         return (i - 1) * 2 + env_type
 
     envs = [1, -1]
-    ps = [p_minus_val, p_plus] # p_sigma: prob of leaving sigma
+    ps = [p_minus_val, p_plus]  # p_sigma: prob of leaving sigma
 
     for i in range(1, N):
         for e_idx, sigma in enumerate(envs):
@@ -75,31 +74,65 @@ def solve_linear_theory_matrix(p_plus, p_minus_val):
 
     # Solve the linear system A * Phi = B
     phi_internal = np.linalg.solve(A, B)
-    
+
     # Return phi_1 for both environments
     return phi_internal[get_idx(1, 0)], phi_internal[get_idx(1, 1)]
 
 # ==========================================
-# 2. Simulation (Discrete Moran Process)
+# 2. Simulation (Gillespie)
 # ==========================================
-def discrete_run(args):
-    p_plus, p_minus_val, init_env = args
-    import random
-    i, env = 1, init_env
-    while 0 < i < N:
-        if random.random() < (p_plus if env == -1 else p_minus_val):
-            env *= -1
-        w_p, w_m = get_rates(i, N, beta, env)
-        r = random.random()
-        if r < w_p: i += 1
-        elif r < w_p + w_m: i -= 1
-    return (i == N)
+def gillespie_run(args):
+    """
+    One stochastic trajectory using the Gillespie SSA.
 
-def simulate_system(p_plus, init_env, runs=3000):
+    Three competing events with rates:
+        birth        : w_plus   (i -> i+1)
+        death        : w_minus  (i -> i-1)
+        env. switch  : p_sigma  (sigma -> -sigma)
+
+    At each step the total propensity is a0 = w_plus + w_minus + p_sigma.
+    The waiting time to the next event is exponential with mean 1/a0, and a
+    single event is selected with probability proportional to its own rate.
+
+    Returns (fixated, time) where time is the continuous (Gillespie) time
+    elapsed. The time value is not used downstream but is kept so the SSA
+    remains a faithful continuous-time simulation.
+    """
+    p_plus, p_minus_val, init_env = args
+    rng = np.random.default_rng()
+
+    i, env = 1, init_env
+    t = 0.0
+    while 0 < i < N:
+        w_p, w_m = get_rates(i, N, beta, env)
+        p_switch = p_plus if env == -1 else p_minus_val
+
+        a0 = w_p + w_m + p_switch
+        if a0 <= 0.0:
+            break  # absorbing in practice, no events possible
+
+        # Time to next event (continuous time)
+        t += rng.exponential(1.0 / a0)
+
+        # Choose which event fires, proportional to its rate
+        r = rng.random() * a0
+        if r < w_p:
+            i += 1
+        elif r < w_p + w_m:
+            i -= 1
+        else:
+            env *= -1
+
+    return (i == N), t
+
+def simulate_system(p_plus, init_env, runs=4000):
+    """Run many SSA trajectories and return the fixation probability
+    (fraction of runs that reached i = N)."""
     args = [(p_plus, p_minus, init_env) for _ in range(runs)]
     with mp.Pool() as pool:
-        results = pool.map(discrete_run, args)
-    return sum(results) / runs
+        results = pool.map(gillespie_run, args)
+
+    return sum(ok for ok, _ in results) / runs
 
 # ==========================================
 # 3. Execution and Plotting
@@ -117,22 +150,24 @@ if __name__ == '__main__':
     sim_p_plus = np.logspace(-4, 0, 12)
     sim_p, sim_m = [], []
 
-    print("Running Simulations...")
+    print("Running Gillespie Simulations...")
     for p in sim_p_plus:
         print(f"  Simulating p+ = {p:.5f}")
         sim_p.append(simulate_system(p, 1, runs=4000))
         sim_m.append(simulate_system(p, -1, runs=4000))
 
+    # --- Fixation probability ---
     plt.figure(figsize=(8, 6))
     plt.plot(p_plus_range, theory_p, 'b-', label='Theory (init: Coexistence)')
     plt.plot(p_plus_range, theory_m, 'r-', label='Theory (init: Coordination)')
-    plt.scatter(sim_p_plus, sim_p, color='blue', marker='+', s=100, label='Sim (init: Coexistence)')
-    plt.scatter(sim_p_plus, sim_m, color='red', marker='o', facecolors='none', s=60, label='Sim (init: Coordination)')
-
+    plt.scatter(sim_p_plus, sim_p, color='blue', marker='+', s=100,
+                label='Gillespie (init: Coexistence)')
+    plt.scatter(sim_p_plus, sim_m, color='red', marker='o', facecolors='none', s=60,
+                label='Gillespie (init: Coordination)')
     plt.xscale('log')
     plt.xlabel(r'Switching probability $p_+$')
     plt.ylabel(r'Fixation probability $\phi_1$')
-    plt.title('')
     plt.legend()
     plt.grid(False)
+
     plt.show()
