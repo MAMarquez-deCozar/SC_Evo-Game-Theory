@@ -1,4 +1,4 @@
-### Script combinado para probabilidad de fijación y tiempo condicional medio ###
+### Script para probabilidad de fijación y tiempo condicional medio ###
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -74,7 +74,6 @@ def solve_time_matrix(p_plus, p_minus_val):
         return (i - 1) * 2 + env_type
 
     envs = [1, -1]
-    # CORREGIDO: Tasa de salida de entorno 1 es p_minus, tasa de salida de -1 es p_plus
     ps = [p_minus_val, p_plus] 
 
     for i in range(1, N):
@@ -152,7 +151,6 @@ def solve_ashcroft_effective_prob(p_plus, p_minus_val):
 
 def solve_ashcroft_effective_time(p_plus, p_minus_val):
     """ Calcula Tiempo Efectivo con proporciones correctas """
-    # CORREGIDO: Mismas proporciones que en la función de probabilidad
     P_plus_env = p_plus / (p_plus + p_minus_val) 
     P_minus_env = p_minus_val / (p_plus + p_minus_val)     
     
